@@ -1,0 +1,62 @@
+---
+title: "preliminary_data"
+author: "Varun Khanna"
+date: "29 October 2018"
+output:
+  github_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Preliminary data
+
+```{r plot1}
+# Load library and read the compounds
+library("ChemmineR")
+library("tidyverse")
+actives<- read.SDFset("data/actives.sdf")
+inactives <- read.SDFset("data/inactives.sdf")
+
+# Calclate PubChem fingerprint bits (chemical motifs) 
+fpsetActive<- fp2bit(actives, type = 3)
+fpsetInActive<- fp2bit(inactives, type = 3)
+
+# Convert to matirx 
+fpmaInactive <- as.matrix(fpsetInActive)
+fpmaActive <- as.matrix(fpsetActive)
+
+# To look at all the PubChem motifs see the file pubchemFPencoding the repo.
+
+# Figure 1
+
+# Plot the type of PubChem fingerprint bits for active and inactive dataset. 
+#Note there are some motifs which are highly represented in inactive compounds(red color) but not in actives compounds (in blue)
+plot(table(rowSums(fpmaActive)), col = "blue", type = "l", xlim = c(65,250), ylab = "Frequency of pubchem motifs in compounds", xlab = "Pubchem motif", cex.axis = 0.8, las =1)
+lines(table(rowSums(fpmaInactive)), col = "red", type = "l")
+legend("topleft", c("Active","Inactive"),lty = c(1,1),col = c("blue","red"), lwd = 2, bty = "n")
+title(main = "Type of PubChem fingerprint bits in active and inactive compounds")
+
+
+# Figure 2
+
+# Find the motifs which are more represented in actives and less in inactives and *vice versa.*
+
+fp_active <- colSums(fpmaActive) %>% data.frame()
+fp_active$motif <- colnames(fpmaActive)
+names(fp_active)<- c("freq_active", "motif")
+fp_active$percent_active <- (fp_active$freq/328)*100
+
+fp_inactive <- colSums(fpmaInactive) %>% data.frame()
+fp_inactive$motif <- colnames(fpmaInactive)
+names(fp_inactive)<- c("freq_inactive", "motif")
+fp_inactive$percent_inactive <- (fp_inactive$freq/430)*100
+
+combined <- bind_cols(fp_active,fp_inactive)
+combined <- mutate(combined, diff_active_inactive = percent_active - percent_inactive)
+diff_data <- combined %>% filter(diff_active_inactive < -30 | diff_active_inactive > 30)
+
+# Plot the motiffs which may be important for the model to distingiush between actives and inactive compounds.
+ggplot(diff_data, aes( x= motif , y = diff_active_inactive, fill = diff_active_inactive > 0)) + geom_bar(stat = "identity") + coord_flip() + labs(y = "Difference in % of the motif",x = "PubChem motif") + scale_fill_discrete(name = "Dataset", labels = c("Inactive","Active"), values=c("#999999", "#E69F00"))
